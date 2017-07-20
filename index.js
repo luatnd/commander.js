@@ -424,6 +424,169 @@ Command.prototype.option = function(flags, description, fn, defaultValue) {
   return this;
 };
 
+
+
+/**
+ * Define 3 types of option:
+ *
+ *  required: Option must be defined by user,
+ *            example usage: foo-cmd -aRequiredOptionName optionValue
+ *
+ *  optional: User can specify or not
+ *
+ *  toggle:   Boolean option type, value true if its name was specified and false vice versa,
+ *            user don't have to input value
+ *            example usage: foo-cmd -aToggleOptionName
+ *
+ * @type {{required: string, optional: string, toggle: string}}
+ */
+const OptionTypeType = {
+  required: "required",
+  optional: "optional",
+  toggle:   "toggle"
+};
+
+/*
+ Typescript definition for Option:
+ 
+ interface OptionType {
+   short?:string,               // [optional]cmd short form, must follow by -, syntax: -d
+   long:string,                 // cmd long form, must follow by --, syntax: --domain
+   desc:string,                 // Description of the option
+   type:OptionTypeType,         // OptionTypeType.* // Required issue: https://github.com/tj/commander.js/issues/230
+   defaultValue?:any,           // [optional] can not default value when type=OptionTypeType.required, so program will ignore this val
+   parseFn?:(value:any) => any, // [optional] Effected only when user declare this option, if not we got undefined instead of this value
+ }
+ 
+ Typescript definition for CmdConfig:
+ interface CmdConfigType {
+   version?:string,
+   usage?:string,
+   options:{
+      [key:string]:OptionType
+   }
+ }
+ */
+
+
+/**
+ * Define option with json configuration, for readable,
+ * Make program more declarative.
+ *
+ * Examples, a domain changer cmd config:
+ *
+ * const conf = {
+ *    version:"optional string",
+ *    usage:"optional string",
+ *    options:{
+ *        domain: {
+ *            short:      "-d",
+ *            long:       "--domain",
+ *            desc:       "Which domain do you wanna change to",
+ *            type:       OptionTypeType.required, // NOTE: required parsing is still an issue: https://github.com/tj/commander.js/issues/230
+ *            defaultVal: '', // defaultVal will be ignored if type is required
+ *            parseFn:    this.parseDomain, // NOTE: this Fn was execute only when the option was specify on user command || NOTE2: TODO: Verify this note: its must be ES5 syntax ???
+ *        },
+ *        update: {
+ *            long:       "--update",
+ *            desc:       "Do update to the newest source code for this domain",
+ *            type:       OptionTypeType.toggle,
+ *        },
+ *        reset:  {
+ *            short:      "-r",
+ *            long:       "--reset",
+ *            desc:       "Do `git reset --hard` for this domain",
+ *            type:       OptionTypeType.toggle,
+ *            defaultVal: false, // default value will valuable when type is not required like this
+ *        },
+ *    }
+ * };
+ *
+ *
+ * NOTE: {
+ *    For required and optional issue:
+ *    Because configure() is a bridge to .option() and option() was run before parse()
+ *    So that configure() wont validate values, we still have an existing issue: https://github.com/tj/commander.js/issues/230
+ * }
+ *
+ * TODO: {
+ *    Make "required" / optional work
+ * }
+ *
+ *
+ * @param {Object} conf
+ * @return {Command} for chaining
+ * @api public
+ */
+Command.prototype.configure = function (conf) {
+  var self = this;
+
+  function __generateTypeMarkup(option) {
+    switch (option.type) {
+      case OptionTypeType.required:
+        return '<' + option.long.replace(/^--/, '') + '>';
+      case OptionTypeType.optional:
+        return '[' + option.long.replace(/^--/, '') + ']';
+      case OptionTypeType.toggle:
+        return (option.defaultVal) ? '-no-' : ''; // NOTE: This is base on index.js:333 (-no- notation)
+      default:
+        return '';
+    }
+  }
+  
+  function __validateOptionSyntax(option) {
+    var optionList = [OptionTypeType.required, OptionTypeType.optional, OptionTypeType.toggle];
+    
+    const shortPattern = /^-[a-zA-Z]{1}$/;
+    const longPattern = /^--[a-zA-Z0-9][a-zA-Z0-9_\-]+$/;
+    const typePattern = new RegExp('^(' + optionList.join('|') + ')$');
+
+    if (option.short && !shortPattern.test(option.short)) {
+      self.invalidArgumentSyntax("Invalid short form format, example of short form: -u, but got " + option.short);
+    }
+    
+    if (!longPattern.test(option.long)) {
+      self.invalidArgumentSyntax("Invalid long form format, example of long form: --update, but got " + option.long);
+    }
+    
+    if (!typePattern.test(option.type)) {
+      self.invalidArgumentSyntax("Invalid type format, must be: " + optionList.join(' or ') + ", but got " + option.type);
+    }
+  }
+  
+  if (conf.version) {
+    self.version(conf.version);
+  }
+  
+  if (conf.usage) {
+    self.usage(conf.usage);
+  }
+  
+  // Object.keys is safe and fast: http://node.green/#ES2015-misc-own-property-order-Object-keys
+  /**
+   * @var {{short, long, type, desc, defaultVal, parseFn}} conf.options
+   */
+  Object.keys(conf.options).forEach(function(optionKey) {
+    var option = conf.options[optionKey];
+
+    __validateOptionSyntax(option);
+    
+    var pairs = {
+      short:  option.short? option.short: '',
+      long:   option.long,
+      markup: __generateTypeMarkup(option)
+    };
+    var flag = "short, long markup".replace(/(\w+)/g, function (match, subMatch) {
+      return pairs[subMatch];
+    });
+    var defaultVal = (option.type == OptionTypeType.required) ? undefined : option.defaultVal;
+
+    self.option(flag, option.desc, option.parseFn, defaultVal);
+  });
+  
+  return this;
+};
+
 /**
  * Allow unknown options on the command line.
  *
@@ -781,6 +944,20 @@ Command.prototype.opts = function() {
 Command.prototype.missingArgument = function(name) {
   console.error();
   console.error("  error: missing required argument `%s'", name);
+  console.error();
+  process.exit(1);
+};
+
+/**
+ * user input wrong argument syntax,
+ * Example:
+ *    short is -uu or --u,
+ *    long is: -u or ---u
+ * @param msg
+ */
+Command.prototype.invalidArgumentSyntax = function(msg) {
+  console.error();
+  console.error("  error: %s", msg);
   console.error();
   process.exit(1);
 };
