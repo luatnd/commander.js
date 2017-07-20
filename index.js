@@ -371,7 +371,17 @@ Command.prototype.option = function(flags, description, fn, defaultValue) {
       }
     }
     else {
-      defaultValue = fn;
+  
+      /**
+       * Allow the case: , fn = null, defaultValue = "was specify"
+       *
+       * For example someone can defined like that:
+       *    .option('-c, --cheese [type]', 'Add the specified type of cheese [marble]', null, 'marble')
+       */
+      if (typeof defaultValue === 'undefined') {
+        defaultValue = fn;
+      }
+
       fn = null;
     }
   }
