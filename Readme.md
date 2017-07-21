@@ -44,6 +44,76 @@ console.log('  - %s cheese', program.cheese);
 
  Short flags may be passed as a single arg, for example `-abc` is equivalent to `-a -b -c`. Multi-word options such as "--template-engine" are camel-cased, becoming `program.templateEngine` etc.
 
+## Option parsing with configure()
+
+Options with commander are defined with the `.option()` method.
+But if you feel `.option()` are hard to use in some case, the clearly JSON configuration might help:
+
+```js
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+var program = require('commander');
+
+program
+  .configure({
+    version: '0.1.x',
+    usage:   'To show the example of configure(), make option declarative',
+    options: {
+      toDomain: {
+        short:      "-d",
+        long:       "--toDomain",
+        desc:       "Which domain do you wanna change to",
+        type:       "required",
+        parseFn:    this.parseDomain,
+      },
+      reset:  {
+        short:      "-r",
+        long:       "--reset",
+        desc:       "Do `git reset --hard` for this domain",
+        type:       "toggle",
+        defaultVal: false, // default value will valuable when type is not required like this
+      },
+      templateEngine: {
+        short:      "-t",
+        long:       "--template-engine",
+        desc:       "Add template [engine] support",
+        type:       "optional",
+        defaultVal: "jade",
+      },
+    }
+  })
+  .parse(process.argv);
+
+
+// Try: node examples/configure.js -d "http://example.co" --update -r -c 2cheese --list 2,3
+
+console.log('  - %s toDomain', program.toDomain);
+console.log('  - %s reset', program.reset);
+console.log('  - %s template engine', program.templateEngine);
+
+console.log('program._version: ', program._version);
+console.log('program._usage: ', program._usage);
+```
+
+`configure()` above is a wrapper and port directly to `.option()`.
+
+More detail about configure():
+
+| option attr | required ? |Example         | Format                            | desc  |
+| :---        |       ---: | :---           | :---                              | :--- |
+|short        |No          |`-d`            | `/^-[a-zA-Z]{1}$/`                | Define short form of option|
+|long         |Yes         |`--log-debug`   | `/^--[a-zA-Z0-9][a-zA-Z0-9_\-]+$/`| Define long form of option|
+|desc         |Yes         | `Log all debug`| `/.*/`                            | The description of option, helpful when you run --help |
+|type         |Yes         |`toggle`        | `/^(required\|optional\|toggle)$/`| Option type:<br>\* `required`: User must specify this option when run cmd<br>\* `optional`: User can specify this option or not, if not then `defaultVal` will be the value<br>\* `toggle`: Is boolean option, make option's value is `true`/`false`. User can specify this option or not, if not specified then `defaultVal` will be the value|
+|defaultVal   |No          |`true`          | `/.*/`                            | * If `type=required` then `defaultVal` was ignored. <br>\* If `type=optional` then `defaultVal` will work. <br>\* If `type=toggle` then `defaultVal` must be `true`/`false`<br>\* If `defaultVal` was not specified incase of `toggle` then defaultVal will be consider to `false`).| 
+|parseFn      |No          |`function (val) {`<br>`    return !!val`<br>`}`| Must be function   | Define long form of option|
+
+>NOTE: `.configure()` port to `.option()` so that some issue about commander core still exist [here](https://github.com/tj/commander.js/issues).<br>
+>You can try `.option()` to ensure that `.configure()` work exactly the same.
 
 ## Coercion
 
