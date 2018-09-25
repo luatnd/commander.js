@@ -3,7 +3,8 @@
 
 [![Build Status](https://api.travis-ci.org/tj/commander.js.svg?branch=master)](http://travis-ci.org/tj/commander.js)
 [![NPM Version](http://img.shields.io/npm/v/commander.svg?style=flat)](https://www.npmjs.org/package/commander)
-[![NPM Downloads](https://img.shields.io/npm/dm/commander.svg?style=flat)](https://www.npmjs.org/package/commander)
+[![NPM Downloads](https://img.shields.io/npm/dm/commander.svg?style=flat)](https://npmcharts.com/compare/commander?minimal=true)
+[![Install Size](https://packagephobia.now.sh/badge?p=commander)](https://packagephobia.now.sh/result?p=commander)
 [![Join the chat at https://gitter.im/tj/commander.js](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/tj/commander.js?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
   The complete solution for [node.js](http://nodejs.org) command-line interfaces, inspired by Ruby's [commander](https://github.com/commander-rb/commander).  
@@ -16,7 +17,7 @@
 
 ## Option parsing
 
- Options with commander are defined with the `.option()` method, also serving as documentation for the options. The example below parses args and options from `process.argv`, leaving remaining args as the `program.args` array which were not consumed by options.
+Options with commander are defined with the `.option()` method, also serving as documentation for the options. The example below parses args and options from `process.argv`, leaving remaining args as the `program.args` array which were not consumed by options.
 
 ```js
 #!/usr/bin/env node
@@ -42,8 +43,65 @@ if (program.bbqSauce) console.log('  - bbq');
 console.log('  - %s cheese', program.cheese);
 ```
 
- Short flags may be passed as a single arg, for example `-abc` is equivalent to `-a -b -c`. Multi-word options such as "--template-engine" are camel-cased, becoming `program.templateEngine` etc.
+Short flags may be passed as a single arg, for example `-abc` is equivalent to `-a -b -c`. Multi-word options such as "--template-engine" are camel-cased, becoming `program.templateEngine` etc.
 
+Note that multi-word options starting with `--no` prefix negate the boolean value of the following word. For example, `--no-sauce` sets the value of `program.sauce` to false.
+
+```js
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+var program = require('commander');
+
+program
+  .option('--no-sauce', 'Remove sauce')
+  .parse(process.argv);
+
+console.log('you ordered a pizza');
+if (program.sauce) console.log('  with sauce');
+else console.log(' without sauce');
+```
+
+## Version option
+
+Calling the `version` implicitly adds the `-V` and `--version` options to the command.
+When either of these options is present, the command prints the version number and exits.
+
+    $ ./examples/pizza -V
+    0.0.1
+
+If you want your program to respond to the `-v` option instead of the `-V` option, simply pass custom flags to the `version` method using the same syntax as the `option` method.
+
+```js
+program
+  .version('0.0.1', '-v, --version')
+```
+
+The version flags can be named anything, but the long option is required.
+
+## Command-specific options
+
+You can attach options to a command.
+
+```js
+#!/usr/bin/env node
+
+var program = require('commander');
+
+program
+  .command('rm <dir>')
+  .option('-r, --recursive', 'Remove recursively')
+  .action(function (dir, cmd) {
+    console.log('remove ' + dir + (cmd.recursive ? ' recursively' : ''))
+  })
+
+program.parse(process.argv)
+```
+
+A command's options are validated when the command is used. Any unknown options will be reported as an error. However, if an action-based command does not define an action, then the options are not validated.
 ## Option parsing with configure()
 
 Options with commander are defined with the `.option()` method.
@@ -109,7 +167,7 @@ More detail about configure():
 |long         |Yes         |`--log-debug`   | `/^--[a-zA-Z0-9][a-zA-Z0-9_\-]+$/`| Define long form of option|
 |desc         |Yes         | `Log all debug`| `/.*/`                            | The description of option, helpful when you run --help |
 |type         |Yes         |`toggle`        | `/^(required\|optional\|toggle)$/`| Option type:<br>\* `required`: User must specify this option when run cmd<br>\* `optional`: User can specify this option or not, if not then `defaultVal` will be the value<br>\* `toggle`: Is boolean option, make option's value is `true`/`false`. User can specify this option or not, if not specified then `defaultVal` will be the value|
-|defaultVal   |No          |`true`          | `/.*/`                            | * If `type=required` then `defaultVal` was ignored. <br>\* If `type=optional` then `defaultVal` will work. <br>\* If `type=toggle` then `defaultVal` must be `true`/`false`<br>\* If `defaultVal` was not specified incase of `toggle` then defaultVal will be consider to `false`).| 
+|defaultVal   |No          |`true`          | `/.*/`                            | * If `type=required` then `defaultVal` was ignored. <br>\* If `type=optional` then `defaultVal` will work. <br>\* If `type=toggle` then `defaultVal` must be `true`/`false`<br>\* If `defaultVal` was not specified incase of `toggle` then defaultVal will be consider to `false`).|
 |parseFn      |No          |`function (val) {`<br>`    return !!val`<br>`}`| Must be function   | Define long form of option|
 
 >NOTE: `.configure()` port to `.option()` so that some issue about commander core still exist [here](https://github.com/tj/commander.js/issues).<br>
@@ -165,7 +223,7 @@ program
   .option('-s --size <size>', 'Pizza size', /^(large|medium|small)$/i, 'medium')
   .option('-d --drink [drink]', 'Drink', /^(coke|pepsi|izze)$/i)
   .parse(process.argv);
-  
+
 console.log(' size: %j', program.size);
 console.log(' drink: %j', program.drink);
 ```
@@ -245,7 +303,7 @@ program
 When `.command()` is invoked with a description argument, no `.action(callback)` should be called to handle sub-commands, otherwise there will be an error. This tells commander that you're going to use separate executables for sub-commands, much like `git(1)` and other popular tools.  
 The commander will try to search the executables in the directory of the entry script (like `./examples/pm`) with the name `program-command`, like `pm-install`, `pm-search`.
 
-Options can be passed with the call to `.command()`. Specifying `true` for `opts.noHelp` will remove the option from the generated help output. Specifying `true` for `opts.isDefault` will run the subcommand if no other subcommand is specified.
+Options can be passed with the call to `.command()`. Specifying `true` for `opts.noHelp` will remove the subcommand from the generated help output. Specifying `true` for `opts.isDefault` will run the subcommand if no other subcommand is specified.
 
 If the program is designed to be installed globally, make sure the executables have proper modes, like `755`.
 
@@ -260,22 +318,20 @@ You can enable `--harmony` option in two ways:
  The help information is auto-generated based on the information commander already knows about your program, so the following `--help` info is for free:
 
 ```  
- $ ./examples/pizza --help
+$ ./examples/pizza --help
+Usage: pizza [options]
 
-   Usage: pizza [options]
+An application for pizzas ordering
 
-   An application for pizzas ordering
+Options:
 
-   Options:
-
-     -h, --help           output usage information
-     -V, --version        output the version number
-     -p, --peppers        Add peppers
-     -P, --pineapple      Add pineapple
-     -b, --bbq            Add bbq sauce
-     -c, --cheese <type>  Add the specified type of cheese [marble]
-     -C, --no-cheese      You do not want any cheese
-
+  -h, --help           output usage information
+  -V, --version        output the version number
+  -p, --peppers        Add peppers
+  -P, --pineapple      Add pineapple
+  -b, --bbq            Add bbq sauce
+  -c, --cheese <type>  Add the specified type of cheese [marble]
+  -C, --no-cheese      You do not want any cheese
 ```
 
 ## Custom help
@@ -283,7 +339,7 @@ You can enable `--harmony` option in two ways:
  You can display arbitrary `-h, --help` information
  by listening for "--help". Commander will automatically
  exit once you are done so that the remainder of your program
- does not execute causing undesired behaviours, for example
+ does not execute causing undesired behaviors, for example
  in the following executable "stuff" will not output when
  `--help` is used.
 
@@ -306,11 +362,11 @@ program
 // node's emit() is immediate
 
 program.on('--help', function(){
-  console.log('  Examples:');
+  console.log('')
+  console.log('Examples:');
   console.log('');
-  console.log('    $ custom-help --help');
-  console.log('    $ custom-help -h');
-  console.log('');
+  console.log('  $ custom-help --help');
+  console.log('  $ custom-help -h');
 });
 
 program.parse(process.argv);
@@ -321,7 +377,6 @@ console.log('stuff');
 Yields the following help output when `node script-name.js -h` or `node script-name.js --help` are run:
 
 ```
-
 Usage: custom-help [options]
 
 Options:
@@ -336,7 +391,6 @@ Examples:
 
   $ custom-help --help
   $ custom-help -h
-
 ```
 
 ## .outputHelp(cb)
@@ -355,9 +409,9 @@ program
   .command('getstream [url]', 'get stream URL')
   .parse(process.argv);
 
-  if (!process.argv.slice(2).length) {
-    program.outputHelp(make_red);
-  }
+if (!process.argv.slice(2).length) {
+  program.outputHelp(make_red);
+}
 
 function make_red(txt) {
   return colors.red(txt); //display the help text in red on the console
@@ -368,6 +422,22 @@ function make_red(txt) {
 
   Output help information and exit immediately.
   Optional callback cb allows post-processing of help text before it is displayed.
+
+
+## Custom event listeners
+ You can execute custom actions by listening to command and option events.
+
+```js
+program.on('option:verbose', function () {
+  process.env.VERBOSE = this.verbose;
+});
+
+// error on unknown commands
+program.on('command:*', function () {
+  console.error('Invalid command: %s\nSee --help for a list of available commands.', program.args.join(' '));
+  process.exit(1);
+});
+```
 
 ## Examples
 
@@ -398,11 +468,11 @@ program
   .action(function(cmd, options){
     console.log('exec "%s" using %s mode', cmd, options.exec_mode);
   }).on('--help', function() {
-    console.log('  Examples:');
-    console.log();
-    console.log('    $ deploy exec sequential');
-    console.log('    $ deploy exec async');
-    console.log();
+    console.log('');
+    console.log('Examples:');
+    console.log('');
+    console.log('  $ deploy exec sequential');
+    console.log('  $ deploy exec async');
   });
 
 program
